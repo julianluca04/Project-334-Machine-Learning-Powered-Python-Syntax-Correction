@@ -1,76 +1,59 @@
 import pandas as pd
-from transformers import AutoTokenizer
 import torch
+from transformers import AutoTokenizer
 
+# 1. Configuration (Keep everything in one place)
+MODEL_NAME = "Salesforce/codet5-small"
+MAX_LENGTH = 128
+PREFIX = "fix python: "
+FILE_PATH = 'code_bug_fix_pairs.csv'
 
+# 2. Setup
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+df = pd.read_csv(FILE_PATH)
 
-def save_tokenized_data():
-    all_inputs = []
-    all_labels = []
+def prepare_and_save_dataset(dataframe):
+    print(f"Tokenizing {len(dataframe)} pairs...")
 
-    for i in range(len(df)):
-        # Tokenize pair
-        inputs = tokenizer("fix: " + df['buggy_code'][i], truncation=True, padding='max_length', max_length=128)
-        labels = tokenizer(df['fixed_code'][i], truncation=True, padding='max_length', max_length=128)
-        
-        all_inputs.append(inputs['input_ids'])
-        all_labels.append(labels['input_ids'])
+    # OPTIMIZATION: Pass the whole list to the tokenizer (Batching)
+    # This is much faster than a 'for' loop
+    inputs = [PREFIX + str(code) for code in dataframe['buggy_code'].tolist()]
+    targets = [str(code) for code in dataframe['fixed_code'].tolist()]
 
-    # Save as a PyTorch file
-    training_data = {
-        "input_ids": torch.tensor(all_inputs),
-        "labels": torch.tensor(all_labels)
-    }
-    torch.save(training_data, "processed_training_data.pt")
-    print("Success: Binary training file created!")
-
-
-
-
-
-
-# 1. Load your local CSV
-df = pd.read_csv('code_bug_fix_pairs.csv')
-
-# 2. Use a tokenizer designed for code logic
-# 'Salesforce/codet5-small' is lightweight and excellent for M1 Max hardware
-tokenizer = AutoTokenizer.from_pretrained("Salesforce/codet5-small")
-
-def preprocess_function(buggy_code, fixed_code):
-    # We prefix the input so the model knows the task
-    input_text = "fix python: " + buggy_code
-    
-    # Tokenize input (Buggy)
+    # Tokenize inputs
     model_inputs = tokenizer(
-        input_text, 
-        max_length=128, 
+        inputs, 
+        max_length=MAX_LENGTH, 
         padding="max_length", 
         truncation=True, 
         return_tensors="pt"
     )
 
-    # Tokenize labels (Fixed)
-    # The model learns to transform input_ids into these labels
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(
-            fixed_code, 
-            max_length=128, 
-            padding="max_length", 
-            truncation=True, 
-            return_tensors="pt"
-        )
+    # Tokenize targets
+    # Note: Modern transformers use 'text_target' instead of the 'with' block
+    labels = tokenizer(
+        text_target=targets, 
+        max_length=MAX_LENGTH, 
+        padding="max_length", 
+        truncation=True, 
+        return_tensors="pt"
+    )["input_ids"]
 
-    return model_inputs["input_ids"], labels["input_ids"]
+    # 3. Handle Padding in Labels
+    # Important: Replace padding token id (0) with -100 
+    # so the loss function ignores them during training
+    labels[labels == tokenizer.pad_token_id] = -100
 
-# Example: Process the first pair
-input_ids, label_ids = preprocess_function(df['buggy_code'][0], df['fixed_code'][0])
+    # 4. Save
+    training_data = {
+        "input_ids": model_inputs["input_ids"],
+        "attention_mask": model_inputs["attention_mask"],
+        "labels": labels
+    }
+    
+    torch.save(training_data, "processed_training_data.pt")
+    print("Success: Binary training file 'processed_training_data.pt' created!")
 
-print(f"Tokenized Input (First 10 IDs): {input_ids[0][:10]}")
-print(f"Decoded back to text: {tokenizer.decode(input_ids[0], skip_special_tokens=True)}")
-
-
-
-
-
-
-save_tokenized_data()
+# Run the process
+if __name__ == "__main__":
+    prepare_and_save_dataset(df)
