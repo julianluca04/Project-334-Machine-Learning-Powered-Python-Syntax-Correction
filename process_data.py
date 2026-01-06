@@ -1,33 +1,49 @@
 import pandas as pd
-import os
-import re
+import tokenize
+import io
 
-# 1. Setup paths
-input_file = 'buggy_dataset/train.pkl' # Adjust based on your download
-output_dir = 'processed_data'
-os.makedirs(f"{output_dir}/buggy", exist_ok=True)
-os.makedirs(f"{output_dir}/fixed", exist_ok=True)
+INPUT_CSV = "code_bug_fix_pairs.csv"
+OUTPUT_CSV = "code_bug_fix_pairs_tokenized.csv"
 
-def clean_code(code):
-    """Optional: Basic cleaning to focus on syntax as you requested."""
-    # This keeps the code logic but you can add string-stripping regex here
-    return code.strip()
+def py_tokenize(code: str) -> list[str]:
+    """
+    Tokenize Python code using Python's own lexer.
+    Skips whitespace/newlines/indent/dedent/endmarkers.
+    Falls back to whitespace split if the code is too broken to tokenize.
+    """
+    tokens: list[str] = []
+    try:
+        reader = io.StringIO(str(code)).readline
+        for tok in tokenize.generate_tokens(reader):
+            if tok.type in (
+                tokenize.ENCODING,
+                tokenize.NL,
+                tokenize.NEWLINE,
+                tokenize.INDENT,
+                tokenize.DEDENT,
+                tokenize.ENDMARKER,
+            ):
+                continue
+            tokens.append(tok.string)
+    except tokenize.TokenError:
+        tokens = str(code).strip().split()
+    return tokens
 
-# 2. Load the data
-print("Loading dataset...")
-df = pd.read_pickle(input_file)
+def main() -> None:
+    print(f"Loading {INPUT_CSV} ...")
+    df = pd.read_csv(INPUT_CSV)
 
-# 3. Process and Save
-print(f"Processing {len(df)} snippets...")
-for i, row in df.iterrows():
-    # We use 'without_docstrings' to keep the model lightweight for your M1 Max
-    buggy_content = clean_code(row['before_merge_without_docstrings'])
-    fixed_content = clean_code(row['after_merge_without_docstrings'])
-    
-    # Save as individual .py files for easy viewing/testing
-    with open(f"{output_dir}/buggy/snippet_{i}.py", "w") as f:
-        f.write(buggy_content)
-    with open(f"{output_dir}/fixed/snippet_{i}.py", "w") as f:
-        f.write(fixed_content)
+    required_cols = {"buggy_code", "fixed_code"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}. Found: {list(df.columns)}")
 
-print(f"Done! Files saved in {output_dir}")f
+    print("Tokenizing buggy_code and fixed_code ...")
+    df["buggy_tokens"] = df["buggy_code"].apply(py_tokenize)
+    df["fixed_tokens"] = df["fixed_code"].apply(py_tokenize)
+
+    df.to_csv(OUTPUT_CSV, index=False)
+    print(f"Done! Wrote {OUTPUT_CSV}")
+
+if __name__ == "__main__":
+    main()
