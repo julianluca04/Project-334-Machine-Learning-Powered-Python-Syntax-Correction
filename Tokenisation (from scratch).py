@@ -1,37 +1,35 @@
 import pandas as pd
 import json
-from collections import Counter
 
-df = pd.read_csv("code_bug_fix_pairs.csv")
+df = pd.read_csv("code_bug_fix_pairs.csv") # read data and turn into dataframe
 
 
-def build_char_vocab(df):
-    all_text = "".join(df["buggy_code"].astype(str)) + "".join(df["fixed_code"].astype(str))
-    unique_chars = sorted(list(set(all_text)))
-    vocab = {"<PAD>": 0, "<UNK>": 1, "<SOS>": 2, "<EOS>": 3}
-    for char in unique_chars:
-        if char not in vocab:
-            vocab[char] = len(vocab)      
-    return vocab
+def vocabulary(df): # this is a function to build character vocabulary
 
-vocab = build_char_vocab(df)
+    full_text = "".join(df["buggy_code"].astype(str)) + "".join(df["fixed_code"].astype(str))
+    # full text is a single string containing all characters from both columns
+    # we joined them by empty spaces and converted to string type (+ adds them together)
+    characters = sorted(list(set(full_text)))
+    # we remove duplicates by converting string to set, then we convert it to list and sort it
 
-#Converter
-def char_to_ids(text, vocab):
-    text = str(text) 
-    return [vocab["<SOS>"]] + [vocab.get(c, vocab["<UNK>"]) for c in text] + [vocab["<EOS>"]]
+    vocabulary_dictionary = {"<PAD>": 0, "<UNK>": 1, "<SOS>": 2, "<EOS>": 3}
+    # this is a vocabulary dictionary, we immediately add special tokens with their IDs
+    for char in characters: # we go through our list of characters
+        if char not in vocabulary_dictionary: # if charaters is not already in dictionary
+            vocabulary_dictionary[char] = len(vocabulary_dictionary)
+        # we add it to dictionary
+        # the value (ID) is the current length of the dictionary (we started from 0)     
+    return vocabulary_dictionary
 
-print("Converting code to character ID")
-df["buggy_ids"] = df["buggy_code"].apply(lambda x: char_to_ids(x, vocab))
-df["fixed_ids"] = df["fixed_code"].apply(lambda x: char_to_ids(x, vocab))
+our_vocabulary = vocabulary(df) # we define our vocabulary from dataframe
 
 #Docs
-with open("vocab.json", "w", encoding="utf-8") as f:
-    json.dump(vocab, f, indent=4)
+with open("vocabulary_from_scratch.json", "w", encoding="utf-8") as f:
+    json.dump(our_vocabulary, f, indent=4)
 
-vocab_df = pd.DataFrame(list(vocab.items()), columns=['Character', 'ID'])
-vocab_df.to_csv('vocabulary_from_scratch.csv', index=False)
+vocabulary_df = pd.DataFrame(list(our_vocabulary.items()), columns=['Character', 'ID'])
+vocabulary_df.to_csv('vocabulary_from_scratch.csv', index=False)
 
 #Final Print Statements
-print(f"Vocabulary size: {len(vocab)}")
-print("vocab.json and vocabulary_from_scratch.csv are saved")
+print(f"Vocabulary size: {len(our_vocabulary)}")
+print("vocabulary_from_scratch.json and vocabulary_from_scratch.csv are saved")
