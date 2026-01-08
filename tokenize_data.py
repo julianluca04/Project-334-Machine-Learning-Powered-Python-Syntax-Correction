@@ -111,3 +111,26 @@ for idx, row in df.iterrows():
 
 pd.DataFrame(verification_data).to_csv('visible_token_check.csv', index=False)
 print("Success: 'visible_token_check.csv' created.")
+
+
+
+
+# --- NEW Step 6: Reconstruction Test ---
+print("\n--- RECONSTRUCTION TEST ---")
+
+def decode_ids_to_code(ids_tensor):
+    rebuilt = []
+    for tid in ids_tensor.tolist():
+        if tid == 0: break # Stop at padding
+        word = id_to_token.get(tid, "<UNK>")
+        
+        # Convert symbols back to actual whitespace
+        if word == "[NWLN]": rebuilt.append("\n")
+        elif word == "[INDENT]": rebuilt.append("    ")
+        elif word == "[SPC]": rebuilt.append(" ")
+        else: rebuilt.append(word)
+    return "".join(rebuilt)
+
+# Test Row 0
+test_ids = training_data["input_ids"][0]
+print(f"Row 0 Reconstructed:\n{decode_ids_to_code(test_ids)}")
