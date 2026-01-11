@@ -224,7 +224,31 @@ print("Tokenization, embedding, and positional encoding complete.")
 
 # Tranformer Block
 class TransformerBlock(keras.layers.Layer):
+    """
+    We create a blueprint for a transfromer layer/block (containing multiple sub-layers) 
+    that can be stacked up in a model of many transoformer blocks
+    We combine multi-head attention which captures relationships between tokens
+    and feed-forward networks which process each token individually
+    We use Layer Normalization on inputs to stabilise and speed up training
+    We use Dropout to prevent overfitting by randomly setting some outputs to zero.
+    """
+
     def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
+        """
+    Arguments:
+    embed_dim: Dimension of embedding vectors
+    num_heads: Number of attention heads
+    ff_dim: Dimension of feed-forward network
+    rate: Dropout rate (percentage of neurons to drop) to prevent overfitting
+
+    Returns:
+    1. Multi-head attention layer checks relationships between tokens in sequence
+    2. Feed-forward network processes each token individually, now with context from attention
+    3. Layer normalization, normalizes inputs by adjusting and scaling activations
+    3.1. Adjusting and scaling activations is done by subtracting meand and dividing by std
+    3.2. Epsilon is a small constant to prevent division by zero
+    4. Dropout randomly sets a fraction of input units to 0 at each update during training time 
+    """
         super(TransformerBlock, self).__init__()
         self.att = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.ffn = keras.Sequential(
@@ -236,6 +260,25 @@ class TransformerBlock(keras.layers.Layer):
         self.dropout2 = keras.layers.Dropout(rate)
 
     def call(self, inputs, training):
+        """
+        Arguments:
+        inputs: Combined tensor to the transformer block
+        training: True/False (to train or not to train)
+        
+        Returns:
+        Tensor of same shape as input, but each element is adjusted based on context
+
+        Mechanism:
+        1. Multi-head attention computes attention scores and weighted values,
+        by comparing input to input itself (self-attention)
+        2. Dropout randomly sets a fraction of input units to 0 during training
+        3. First layer normalization normalizes the sum of inputs and attention output
+        4. Feed-forward network processes each token individually
+        5. Second dropout randomly sets a fraction of input units to 0 during training
+        6. Second layer normalization normalizes the sum of the output 
+        from first normalization and feed-forward output
+        7. Result is a smarter tensor
+        """
         attn_output = self.att(inputs, inputs)
         attn_output = self.dropout1(attn_output, training=training)
         out1 = self.layernorm1(inputs + attn_output)
@@ -243,6 +286,6 @@ class TransformerBlock(keras.layers.Layer):
         ffn_output = self.dropout2(ffn_output, training=training)
         return self.layernorm2(out1 + ffn_output)
 transformer_block = TransformerBlock(embed_dim=embedding_dim, num_heads=2, ff_dim=64)
-transformer_output = transformer_block(combined_output, training=False)
+transformer_output = transformer_block(combined_output, training=False) # don´t train yet
 print("Transformer output shape:", transformer_output.shape)
 print("Transformer block applied successfully.")
