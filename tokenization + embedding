@@ -1,0 +1,176 @@
+# Jude´s code for character-level tokenization
+
+import pandas as pd
+df = pd.read_csv("code_bug_fix_pairs.csv")
+
+
+class CharTokenizer:
+    def __init__(self, texts, indent_spaces=4):
+        self.indent_spaces = indent_spaces
+
+        # Special tokens (fixed IDs)
+        self.special_tokens = ["<pad>", "<bos>", "<eos>", "<indent>"] # padding, beginning of sequence, end of sequence, indent
+        self.stoi = {tok: i for i, tok in enumerate(self.special_tokens)} # map string to index
+        self.itos = {i: tok for tok, i in self.stoi.items()} # map index to string
+
+        # Collect characters
+        chars = set() # set of unique characters
+        for text in texts: 
+            chars.update(text) # add all of the unique characters
+
+        # Assign IDs
+        offset = len(self.stoi) # offset by 4, ie numbers taken up by special tokens already
+        for i, ch in enumerate(sorted(chars)): 
+            self.stoi[ch] = i + offset # map the characters to index
+            self.itos[i + offset] = ch # reverse map
+
+        self.vocab_size = len(self.stoi)
+
+    def encode(self, text, add_special_tokens=True):
+        ids = []
+
+        if add_special_tokens:
+            ids.append(self.stoi["<bos>"])
+
+        i = 0
+        while i < len(text):
+            # Handle indentation (only at line start)
+            if text[i] == " ":
+                count = 0
+                while i < len(text) and text[i] == " ":
+                    count += 1
+                    i += 1
+                # you kinda reverse engineer from the amount of spaces how many indents there are
+
+                while count >= self.indent_spaces: # when count bigger than 4 it counts as an indent
+                    ids.append(self.stoi["<indent>"]) # add token for indent
+                    count -= self.indent_spaces # reduce count by 4
+
+                # leftover spaces
+                ids.extend([self.stoi[" "]] * count) # add remaining spaces as formatting spaces basically
+            else:
+                ids.append(self.stoi[text[i]])
+                i += 1
+
+        if add_special_tokens:
+            ids.append(self.stoi["<eos>"])
+
+        return ids
+
+    def decode(self, ids):
+        text = "" #initialize string
+        for i in ids:
+            token = self.itos.get(i, "") # get the token from ids (the index)
+            if token == "<bos>" or token == "<eos>" or token == "<pad>":
+                continue
+            elif token == "<indent>":
+                text += " " * self.indent_spaces #. add 4 spaces if there was an indent
+            else:
+                text += token #just add the token to the string
+        return text
+
+
+import re
+def clean_code_logic(text):
+    if not isinstance(text, str):
+            return ""
+
+    marker = "# Sample ID"
+    index = text.find(marker)
+
+    if index == -1:
+        return text.strip()
+
+    return text[:index].strip()
+
+# --- Step 1: Clean the DataFrame first ---
+print("Cleaning data and building custom vocabulary...")
+
+df['buggy_clean'] = df['buggy_code'].apply(clean_code_logic)
+df['fixed_clean'] = df['fixed_code'].apply(clean_code_logic)
+
+# --- Step 2: Gather cleaned tokens into a list ---
+# Using .tolist() is much faster than iterrows()
+texts = df['buggy_clean'].tolist() + df['fixed_clean'].tolist()
+
+print(f"Collected {len(texts)} cleaned code snippets.")
+
+
+
+tokenizer = CharTokenizer(texts)
+
+print("Vocab size:", tokenizer.vocab_size)
+print(list(tokenizer.stoi.items()))
+
+sample = df.iloc[0]["buggy_clean"]
+print("ORIGINAL:")
+print(repr(sample))
+
+encoded = tokenizer.encode(sample)
+decoded = tokenizer.decode(encoded)
+
+print("ENCODED:")
+print(encoded[:50])  # print first 50 tokens
+print("DECODED:")
+print(repr(decoded))
+
+
+assert decoded == sample
+print("Yippee reversiblityy")
+
+
+
+# Embedding and Padding
+# Encode all entries
+df['buggy_entries'] = df['buggy_clean'].apply(lambda x: tokenizer.encode(x))
+df['fixed_entries'] = df['fixed_clean'].apply(lambda x: tokenizer.encode(x))
+
+# Step 1 - find max length
+max_buggy = max(len(entry) for entry in df['buggy_entries'])
+max_fixed = max(len(entry) for entry in df['fixed_entries'])
+max_entry_length = max(max_buggy, max_fixed)
+
+print(f"Max entry length is {max_entry_length}")
+
+# Step 2 - padding function (no truncation)
+# To keep it safe we will add copy of an entry
+def pad_entry(entry, max_len, pad_token_id):
+    entry = entry.copy()
+    if len(entry) < max_len:
+        entry.extend([pad_token_id] * (max_len - len(entry)))
+    return entry
+
+#Alternative with truncation
+def pad_or_truncate_sequence(entry, max_len, pad_token_id):
+    if len(entry) < max_len:
+        entry.extend([pad_token_id] * (max_len - len(entry)))
+    else:
+        entry = entry[:max_len]
+    return entry
+
+# Step 3 - Pad the entries
+pad_token_id = tokenizer.stoi["<pad>"]
+df['buggy_padded'] = df['buggy_entries'].apply(lambda x: pad_entry(x, max_entry_length, pad_token_id))
+df['fixed_padded'] = df['fixed_entries'].apply(lambda x: pad_entry(x, max_entry_length, pad_token_id))
+
+print(f"Sample padded entry: {df['buggy_padded'].iloc[0]}")
+
+# Save padded entries
+df.to_csv("code_bug_fix_pairs_tokenized_padded.csv", index=False)
+print("Padded entries saved to code_bug_fix_pairs_tokenized_padded.csv")
+
+# Step 4 - embedding layer with Keras
+import tensorflow as tf
+from tensorflow import keras
+
+embedding_dim = 32  # aribitrary choice
+embedding_layer = keras.layers.Embedding(input_dim=tokenizer.vocab_size,
+                                         output_dim=embedding_dim,
+                                         input_length=max_entry_length)
+# Example usage
+sample_padded_entry = df['buggy_padded'].iloc[0]
+sample_padded_entry_tensor = tf.constant([sample_padded_entry])  # batch = 1
+embedded_output = embedding_layer(sample_padded_entry_tensor)
+print("Embedded output shape:", embedded_output.shape)
+print("Embedded output (first 1 token):", embedded_output[0, 0, :]) 
+
