@@ -122,7 +122,6 @@ print("Yippee reversiblityy")
 
 # PHASE 2 - Embedding + Padding
 # Encode all entries 
-# lambda is a function that takes some input (x), and gives defined output (encode)
 df['buggy_entries'] = df['buggy_clean'].apply(tokenizer.encode)
 df['fixed_entries'] = df['fixed_clean'].apply(tokenizer.encode)
 
@@ -169,7 +168,7 @@ embedding_dim = 32  # aribitrary choice of embedding dimension
 embedding_layer = keras.layers.Embedding(input_dim=tokenizer.vocab_size,
                                          output_dim=embedding_dim,
                                          input_length=max_entry_length,
-                                         mask_zero=True)  # mask_zero to ignore padding tokens
+                                         mask_zero=True)  # mask_zero masks the padding tokens
 # Overall there are 3 dimensions: 
 # 1. Batch size (number of entries processed together) TBD
 # 2. Sequence length = max entry length (due to padding)
@@ -211,7 +210,7 @@ def add_positional_encoding(embedded_inputs, pos_enc):
     use tf.cast to convert numpy array to tensor
     we also add a new axis to this tensor to make it 3D (1, seq_len, embed_dim)
     Finally, by adding them, each row of batch gets this same positional encoding
-    Update: we use keras.layers.add to preserve the mask
+    Update: we use "keras.layers.add" instead of "+" to preserve the mask
     """
     positional_encoding_tensor = tf.cast(pos_enc, dtype=tf.float32)
     positional_encoding_tensor = positional_encoding_tensor[tf.newaxis, ...]
@@ -243,6 +242,8 @@ class TransformerBlock(keras.layers.Layer):
     ff_dim: Dimension of feed-forward network
     rate: Dropout rate (percentage of neurons to drop) to prevent overfitting
 
+    Update: make sure model supports masking by setting self.supports_masking = True
+
     Returns:
     1. Multi-head attention layer checks relationships between tokens in sequence
     2. Feed-forward network processes each token individually, now with context from attention
@@ -273,7 +274,7 @@ class TransformerBlock(keras.layers.Layer):
 
         Mechanism:
         1. Multi-head attention computes attention scores and weighted values,
-        by comparing input to input itself (self-attention)
+        by comparing input to input itself (self-attention) while masking padding tokens
         2. Dropout randomly sets a fraction of input units to 0 during training
         3. First layer normalization normalizes the sum of inputs and attention output
         4. Feed-forward network processes each token individually
