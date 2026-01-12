@@ -168,7 +168,8 @@ from tensorflow import keras
 embedding_dim = 32  # aribitrary choice of embedding dimension
 embedding_layer = keras.layers.Embedding(input_dim=tokenizer.vocab_size,
                                          output_dim=embedding_dim,
-                                         input_length=max_entry_length)
+                                         input_length=max_entry_length,
+                                         mask_zero=True)  # mask_zero to ignore padding tokens
 # Overall there are 3 dimensions: 
 # 1. Batch size (number of entries processed together) TBD
 # 2. Sequence length = max entry length (due to padding)
@@ -210,10 +211,11 @@ def add_positional_encoding(embedded_inputs, pos_enc):
     use tf.cast to convert numpy array to tensor
     we also add a new axis to this tensor to make it 3D (1, seq_len, embed_dim)
     Finally, by adding them, each row of batch gets this same positional encoding
+    Update: we use keras.layers.add to preserve the mask
     """
     positional_encoding_tensor = tf.cast(pos_enc, dtype=tf.float32)
     positional_encoding_tensor = positional_encoding_tensor[tf.newaxis, ...]
-    return embedded_inputs + positional_encoding_tensor
+    return keras.layers.add([embedded_inputs, positional_encoding_tensor])
 
 # Combined output is a tensor of the same shape as embedded output
 # However, now each value is adjusted according to its position in the sequence
@@ -250,6 +252,7 @@ class TransformerBlock(keras.layers.Layer):
     4. Dropout randomly sets a fraction of input units to 0 at each update during training time 
     """
         super(TransformerBlock, self).__init__()
+        self.supports_masking = True
         self.att = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.ffn = keras.Sequential(
             [keras.layers.Dense(ff_dim, activation="relu"), keras.layers.Dense(embed_dim),]
@@ -259,7 +262,7 @@ class TransformerBlock(keras.layers.Layer):
         self.dropout1 = keras.layers.Dropout(rate)
         self.dropout2 = keras.layers.Dropout(rate)
 
-    def call(self, inputs, training):
+    def call(self, inputs, training, mask=None): # mask added to ignore padding tokens
         """
         Arguments:
         inputs: Combined tensor to the transformer block
@@ -279,7 +282,7 @@ class TransformerBlock(keras.layers.Layer):
         from first normalization and feed-forward output
         7. Result is a smarter tensor
         """
-        attn_output = self.att(inputs, inputs)
+        attn_output = self.att(inputs, inputs, attention_mask=mask) # mask to ignore padding
         attn_output = self.dropout1(attn_output, training=training)
         out1 = self.layernorm1(inputs + attn_output)
         ffn_output = self.ffn(out1)
