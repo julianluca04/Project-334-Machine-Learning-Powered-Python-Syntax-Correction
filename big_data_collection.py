@@ -79,3 +79,12 @@ df.to_csv(
 print(f"Saved {len(records):,} bug-fix pairs to bug_fix_pairs.csv")
 
 
+
+
+# Count how many rows are identical
+identical_rows = (df['bugged_code'] == df['fixed_code']).sum()
+total_rows = len(df)
+
+print(f"Total rows: {total_rows}")
+print(f"Rows where bugged_code == fixed_code: {identical_rows}")
+print(f"Percentage identical: {identical_rows / total_rows * 100:.2f}%")
