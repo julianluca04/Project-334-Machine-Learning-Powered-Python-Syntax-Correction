@@ -1,0 +1,85 @@
+387/387 ━━━━━━━━━━━━━━━━━━━━ 94s 169ms/step - accuracy: 0.6627 - loss: 1.4338 - val_accuracy: 0.7436 - val_loss: 0.9209
+Epoch 2/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 116ms/step - accuracy: 0.7618 - loss: 0.8705 - val_accuracy: 0.8003 - val_loss: 0.7157
+Epoch 3/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.8129 - loss: 0.6748 - val_accuracy: 0.8382 - val_loss: 0.5623
+Epoch 4/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.8558 - loss: 0.5089 - val_accuracy: 0.9009 - val_loss: 0.3504
+Epoch 5/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 118ms/step - accuracy: 0.9072 - loss: 0.3321 - val_accuracy: 0.9281 - val_loss: 0.2531
+Epoch 6/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9263 - loss: 0.2604 - val_accuracy: 0.9415 - val_loss: 0.2011
+Epoch 7/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9374 - loss: 0.2169 - val_accuracy: 0.9445 - val_loss: 0.1883
+Epoch 8/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 118ms/step - accuracy: 0.9443 - loss: 0.1912 - val_accuracy: 0.9530 - val_loss: 0.1587
+Epoch 9/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9501 - loss: 0.1694 - val_accuracy: 0.9571 - val_loss: 0.1447
+Epoch 10/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9551 - loss: 0.1514 - val_accuracy: 0.9441 - val_loss: 0.1926
+Epoch 11/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 116ms/step - accuracy: 0.9515 - loss: 0.1645 - val_accuracy: 0.9626 - val_loss: 0.1248
+Epoch 12/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9614 - loss: 0.1280 - val_accuracy: 0.9645 - val_loss: 0.1185
+Epoch 13/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9630 - loss: 0.1225 - val_accuracy: 0.9624 - val_loss: 0.1245
+Epoch 14/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9644 - loss: 0.1174 - val_accuracy: 0.9695 - val_loss: 0.1006
+Epoch 15/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9691 - loss: 0.1012 - val_accuracy: 0.9669 - val_loss: 0.1123
+Epoch 16/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 118ms/step - accuracy: 0.9686 - loss: 0.1027 - val_accuracy: 0.9744 - val_loss: 0.0855
+Epoch 17/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 117ms/step - accuracy: 0.9736 - loss: 0.0861 - val_accuracy: 0.9767 - val_loss: 0.0786
+Epoch 18/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 45s 117ms/step - accuracy: 0.9769 - loss: 0.0754 - val_accuracy: 0.9794 - val_loss: 0.0681
+Epoch 19/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 118ms/step - accuracy: 0.9793 - loss: 0.0679 - val_accuracy: 0.9818 - val_loss: 0.0612
+Epoch 20/20
+387/387 ━━━━━━━━━━━━━━━━━━━━ 46s 118ms/step - accuracy: 0.9816 - loss: 0.0599 - val_accuracy: 0.9831 - val_loss: 0.0573
+Tokenizer saved to char_tokenizer_nomask.pkl
+Model saved
+43/43 ━━━━━━━━━━━━━━━━━━━━ 2s 40ms/step - accuracy: 0.9824 - loss: 0.0603
+Final Accuracy: 98.31%
+
+Found 1 GPU(s). Memory growth enabled.
+Combined Dataset Size: 15113 rows
+Cleaning data and building custom vocabulary...
+Collected 30226 cleaned code snippets.
+
+========================================
+FULL DATASET LEVENSHTEIN RESULTS
+========================================
+Average Edit Distance: 9.82 characters
+Max Edit Distance:     173 characters
+Min Edit Distance:     0 characters
+Perfect Fixes (Dist 0): 382 / 1373
+Global Accuracy:       27.82%
+========================================
+
+
+
+==================================================
+CORPUS-LEVEL BLEU SCORE
+==================================================
+Corpus BLEU Score: 95.45%
+==================================================
+
+
+
+Example 4:
+BUGGY:     'n = len(nums)\nif 2 <= n:\n    \nmin_idx, max_idx = 0, 0\n\nfor i in range(1, n):\n    if nums[min_idx] < nums[i]:\n        min_idx = i\n    if nums[max_idx] > nums[i]:\n        max_idx = i'
+PREDICTED: 'n = len(nums)\nif 2 <= n:\n    min_dix, max_dix = 0, 0\n\nfor i in range(1, n):\n    if nums[i] < nums[i]:\n        min_dix = i\n    if nums[min_dix] > nums[min_dix]:\n        max_dix = i'
+ACTUAL:    'n = len(nums)\nif n <= 2:\n    \nmin_idx, max_idx = 0, 0\n\nfor i in range(1, n):\n    if nums[i] < nums[min_idx]:\n        min_idx = i\n    if nums[i] > nums[max_idx]:\n        max_idx = i'
+
+Example 8:
+BUGGY:     'sums = [0]\nfor num in nums:\n    if num > 0:\n        sums.extend([s + num for s in sums])\n        sums.sort(reverse=True)\n    else:\n        sums.append(num)\nk.append(1)'
+PREDICTED: 'sums = [0]\nfor num in nums:\n    if num > 0:\n        sums.extend([s + num for s in sums])\n        sums.sort(reverse=True)\n    else:\n        sums.append(num)'
+ACTUAL:    'sums = [0]\nfor num in nums:\n    if num > 0:\n        sums.extend([s + num for s in sums])\n        sums.sort(reverse=True)\n    else:\n        sums.append(num)'
+------------------------------
+
+Example 9:
+BUGGY:     "from collections import defaultdict\n\n    anagram_map = defaultdict(list)\n\n    for s in strs:\n        key = ''.join(sorted(s))\n        anagram_map[key].update(s)"
+PREDICTED: "from collections import defaultdict\n\n    anagram_map = defaultdict(list)\n\n    for s in strs:\n        key = ''.join(sorted(s))\n        anagram_map[key].append(s)"
+ACTUAL:    "from collections import defaultdict\n\n    anagram_map = defaultdict(list)\n\n    for s in strs:\n        key = ''.join(sorted(s))\n        anagram_map[key].append(s)"
+------------------------------
