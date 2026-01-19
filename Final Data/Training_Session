@@ -1,3 +1,8 @@
+GPU: NVIDIA Quadro GV100
+Time per epoch: 46sec
+Total Training Time: 957sec (15min 57sec)
+118ms per step
+
 Removed 1387 sequences longer than 512
 New dataset size: 13726 samples
 Sample padded entry length: 512
