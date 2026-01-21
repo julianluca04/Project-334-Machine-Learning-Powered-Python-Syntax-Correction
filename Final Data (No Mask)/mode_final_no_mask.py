@@ -435,7 +435,9 @@ def encoder_decoder_transformer_model(
     #######################
     # Encoder Section
     #######################
-
+    """we take inputs of max length embedd them and add positional encoding
+    we then run this inputs and passed them through several layers of encoder
+    transfromer blocks to get the output of the encoder section"""
     encoder_inputs = Input(shape=(max_len,), name="encoder_inputs")
     enc_embed = layers.Embedding(vocab_size, embed_dim)(encoder_inputs)
     pos_enc = positional_encoding(max_len, embed_dim)
@@ -450,6 +452,12 @@ def encoder_decoder_transformer_model(
     #######################
     # Decoder Section
     #######################
+    """Decoder Section has 2 inputs: encoder output + previous tokens from fixed code
+    first steps are embedding + positional encoding
+    We then run inputs through several decoder layers
+    Finally, we define overall output based on both inputs
+    
+    Note: Causal Masking is used in decoder section."""
 
     decoder_inputs = Input(shape=(max_len,), name="decoder_inputs")
     dec_embed = layers.Embedding(vocab_size, embed_dim)(decoder_inputs)
@@ -468,10 +476,26 @@ def encoder_decoder_transformer_model(
 
 # Data modification for encoder-decoder set-up
 def prepare_seq2seq_data(df, max_len):
+    """We use dataframe and maximal length of an entry
+    We turn inputs into numpy arrays
+    X_enc being the buggy code column
+    Y_full being the fixed code column"""
     X_enc = np.array(df['buggy_padded'].tolist())
     Y_full = np.array(df['fixed_padded'].tolist())
 
     # Teacher forcing with same length
+    """Define begining of sequence (bos)
+    X_dec is decoder input
+    At first it has a shape of fixed code array
+    But it is filled with just zeros
+    we define first sequence to be <bos>
+    we shift fixed code array to the right and add it after <bos>
+    by doing this decoder will basically be guessing next token
+    based on previous tokens in fixed code
+    Note: During training, even if it is wrong it will
+    still get the correct version of that token
+    when it will analyse next one
+    """
     bos_token_id = tokenizer.stoi["<bos>"]
     X_dec = np.zeros_like(Y_full)
     X_dec[:, 0] = bos_token_id  # starting sequence
@@ -483,7 +507,7 @@ def prepare_seq2seq_data(df, max_len):
     return X_enc, X_dec, Y
 
 
-
+# Split data for training and testing
 train_df, test_df = train_test_split(df, test_size=0.1, random_state=42)
 X_enc_train, X_dec_train, y_train = prepare_seq2seq_data(train_df, max_entry_length)
 X_enc_test, X_dec_test, y_test = prepare_seq2seq_data(test_df, max_entry_length)
