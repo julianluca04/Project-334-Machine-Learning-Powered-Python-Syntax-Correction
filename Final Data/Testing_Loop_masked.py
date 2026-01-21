@@ -3,9 +3,7 @@ import pickle
 import numpy as np
 from tensorflow import keras
 
-# PRE-REQUISITES
-
-# Tokenizer Blueprint
+# Tokenizer
 class CharTokenizer:
     def __init__(self, texts, indent_spaces=4):
         self.indent_spaces = indent_spaces
@@ -71,9 +69,23 @@ class CharTokenizer:
                 text += token #just add the token to the string
         return text
     
+# Positional Encoding
 
-# Transformer Encoder Blueprint
+def positional_encoding(max_len, d_model):
+    pos_enc = np.zeros((max_len, d_model))
+    for pos in range(max_len):
+        for i in range(0, d_model, 2):
+            pos_enc[pos, i] = np.sin(pos / (10000 ** ((2 * i)/d_model)))
+            if i + 1 < d_model:
+                pos_enc[pos, i + 1] = np.cos(pos / (10000 ** ((2 * (i + 1))/d_model)))
+    return pos_enc
 
+def add_positional_encoding(embedded_inputs, pos_enc):
+    positional_encoding_tensor = tf.cast(pos_enc, dtype=tf.float32)
+    positional_encoding_tensor = positional_encoding_tensor[tf.newaxis, ...]
+    return keras.layers.add([embedded_inputs, positional_encoding_tensor])
+
+# Transformer Blocks
 class TransformerBlock(keras.layers.Layer):
     """
     We create a blueprint for a transfromer layer/block (containing multiple sub-layers) 
@@ -84,7 +96,7 @@ class TransformerBlock(keras.layers.Layer):
     We use Dropout to prevent overfitting by randomly setting some outputs to zero.
     """
 
-    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1, **kwargs):
+    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1,**kwargs):
         """
     Arguments:
     embed_dim: Dimension of embedding vectors
@@ -103,6 +115,7 @@ class TransformerBlock(keras.layers.Layer):
     4. Dropout randomly sets a fraction of input units to 0 at each update during training time 
     """
         super(TransformerBlock, self).__init__(**kwargs)
+        self.supports_masking = True
         self.att = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.ffn = keras.Sequential(
             [keras.layers.Dense(ff_dim, activation="relu"), keras.layers.Dense(embed_dim),]
@@ -112,7 +125,7 @@ class TransformerBlock(keras.layers.Layer):
         self.dropout1 = keras.layers.Dropout(rate)
         self.dropout2 = keras.layers.Dropout(rate)
 
-    def call(self, inputs, training=None): # no mask
+    def call(self, inputs, training=None, mask=None): # mask added to ignore padding tokens
         """
         Arguments:
         inputs: Combined tensor to the transformer block
@@ -132,7 +145,7 @@ class TransformerBlock(keras.layers.Layer):
         from first normalization and feed-forward output
         7. Result is a smarter tensor
         """
-        attn_output = self.att(inputs, inputs) # no mask
+        attn_output = self.att(inputs, inputs, attention_mask=mask)
         attn_output = self.dropout1(attn_output, training=training)
         out1 = self.layernorm1(inputs + attn_output)
         ffn_output = self.ffn(out1)
@@ -140,12 +153,33 @@ class TransformerBlock(keras.layers.Layer):
         return self.layernorm2(out1 + ffn_output)
 
 print("Transformer block applied successfully.")
-    
 
-# Decoder Block
+
+
+
+
+######################################################################
+##### PHASE 5: TRANSFORMER BLOCK - DECODER
+######################################################################
+"""
+Architecture very similar to encoder
+There is an extra sub-layer becuase it has to look at the encoder output
+
+1st layer: look at what you have generated so far
+2nd layer: look at the encoder output (contextualized buggy code)
+3rd layer: Feed Forward*
+
+*In Encoder Feed Forward Network allows for analysed token to be changed
+but based only on buggy code context
+In Decoder feed forward takes into account what has happened so far in fixed code
+
+Each sublayer is followed by droping out 10% of output to avoid overfitting
+And Normalization of values by adding value input value to output
+"""
 class DecoderBlock(keras.layers.Layer):
-    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1, **kwargs):
+    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1,**kwargs):
         super().__init__(**kwargs)
+        self.supports_masking = True
 
         self.self_attn = keras.layers.MultiHeadAttention(
             num_heads=num_heads, key_dim=embed_dim)
@@ -181,30 +215,15 @@ class DecoderBlock(keras.layers.Layer):
         ffn_out = self.ffn(out2)
         ffn_out = self.dropout3(ffn_out, training=training)
         return self.layernorm3(out2 + ffn_out)
-    
-
-# Positional Encoding
-def positional_encoding(max_len, d_model):
-    pos_enc = np.zeros((max_len, d_model))
-    for pos in range(max_len):
-        for i in range(0, d_model, 2):
-            pos_enc[pos, i] = np.sin(pos / (10000 ** ((2 * i)/d_model)))
-            if i + 1 < d_model:
-                pos_enc[pos, i + 1] = np.cos(pos / (10000 ** ((2 * (i + 1))/d_model)))
-    return pos_enc
 
 
-def add_positional_encoding(embedded_inputs, pos_enc):
-    positional_encoding_tensor = tf.cast(pos_enc, dtype=tf.float32)
-    positional_encoding_tensor = positional_encoding_tensor[tf.newaxis, ...]
-    return keras.layers.add([embedded_inputs, positional_encoding_tensor])
-
+# LOOP
 # Load Files
-with open("char_tokenizer_nomask.pkl", 'rb') as f:
+with open("char_tokenizer_final.pkl", 'rb') as f:
     tokenizer = pickle.load(f)
 
 # Use custom_objects so Keras knows where to find your blocks
-model = tf.keras.models.load_model("se2seq_nomask_model.keras", custom_objects={
+model = tf.keras.models.load_model("se2seq_model.keras", custom_objects={
     'TransformerBlock': TransformerBlock,
     'DecoderBlock': DecoderBlock
 })
@@ -221,14 +240,14 @@ import numpy as np
 def predict_fix(buggy_code, max_len=512):
     # Encode input
     enc_input = tokenizer.encode(buggy_code)
-    # Pad to match model's expected shape (1, 512)
+    # Pad to match model shape
     enc_input_padded = enc_input + [tokenizer.stoi["<pad>"]] * (max_len - len(enc_input))
     enc_input_tensor = tf.constant([enc_input_padded[:max_len]])
 
     # Start the decoder with <bos>
     dec_input = [tokenizer.stoi["<bos>"]]
     
-    # Generate characters one by one (Inference Loop)
+    # Generate characters one by one
     for _ in range(max_len):
         # Pad decoder input to 512
         curr_dec_padded = dec_input + [tokenizer.stoi["<pad>"]] * (max_len - len(dec_input))
@@ -239,7 +258,7 @@ def predict_fix(buggy_code, max_len=512):
         
         # Get the character at the current position (the one we just added)
         predicted_id = tf.argmax(predictions[0, len(dec_input)-1, :]).numpy()
-        
+
         if predicted_id == tokenizer.stoi["<eos>"]:
             break
             
@@ -247,7 +266,7 @@ def predict_fix(buggy_code, max_len=512):
         
     return tokenizer.decode(dec_input)
 
-# 3. THE INTERACTIVE LOOP
+# LOOP
 print("\n--- Syntax Fixer AI ---")
 print("Enter your buggy code. Type 'quit' to exit.")
 
