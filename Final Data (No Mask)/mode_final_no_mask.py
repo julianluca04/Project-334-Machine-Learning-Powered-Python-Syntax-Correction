@@ -486,7 +486,7 @@ def prepare_seq2seq_data(df, max_len):
     # Teacher forcing with same length
     """Define begining of sequence (bos)
     X_dec is decoder input
-    At first it has a shape of fixed code array
+    At first it has a shape of fixed code entry
     But it is filled with just zeros
     we define first sequence to be <bos>
     we shift fixed code array to the right and add it after <bos>
