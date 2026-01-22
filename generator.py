@@ -1,47 +1,68 @@
-import csv
 import random
+import pandas as pd
 
-def generate_dataset(num_entries=10000, identity_ratio=0.1):
-    templates = [
-        ("print('{msg}')", ["prin('{msg}')", "primt('{msg}')", "print('{msg}'", "prant('{msg}')"]),
-        ("if {var} == {val}:", ["if {var} = {val}:", "if {var} == {val}", "if {var} === {val}:"]),
-        ("for {i} in range({val}):", ["fop {i} in range({val}):", "for {i} range({val}):", "for {i} in range({val})"]),
-        ("while {var} < {val}:", ["while {var} < {val}", "whil {var} < {val}:", "while {var} {val}:"]),
-        ("{var} += 1", ["{var} =+ 1", "{var} + 1", "{var} plus= 1"]),
-        ("def {func}({arg}):", ["def {func}({arg})", "df {func}({arg}):", "def {func}{arg}:"]),
-        ("return {var}", ["retun {var}", "retrun {var}", "return({var})"]),
-        ("my_list = [{val}, {val2}, {val3}]", ["my_list = [{val} {val2} {val3}]", "my_list = ({val}, {val2}, {val3}]"])
-    ]
+def generate_pro_dataset(num_samples=50000):
+    # Expanded pools to prevent the model from just memorizing 'x' and 'y'
+    vars = ['count', 'total', 'idx', 'buffer_size', 'is_valid', 'temp_str', 'item_val', 'result', 'user_id', 'status_code']
+    vals = ['0', '1', '10', '100', 'True', 'False', 'None', '"Success"', '"Error"', '[]']
+    ops = ['==', '!=', '>', '<', '>=', '<=']
+    
+    # Typing Error Engine: Mimics finger slips
+    def add_noise(text, p=0.08):
+        chars = list(text)
+        for i in range(len(chars)):
+            if random.random() < p:
+                noise_type = random.random()
+                if noise_type < 0.4: # Swap with neighbor letter
+                    chars[i] = random.choice('abdefghilmnoprstuvwy')
+                elif noise_type < 0.7: # Accidental deletion
+                    chars[i] = ""
+        return "".join(chars)
 
-    variables = ['x', 'y', 'i', 'n', 'count', 'data', 'val', 'item']
-    messages = ['Hi', 'Hello', 'Error', 'Done', 'Start']
-    functions = ['main', 'solve', 'check', 'parse', 'run']
+    dataset = []
 
-    with open('synthetic_code_data.csv', 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['buggy_code', 'fixed_code'])
-        writer.writeheader()
+    for _ in range(num_samples):
+        v1, v2, v3 = random.sample(vars, 3)
+        val1, val2 = random.sample(vals, 2)
+        op1 = random.choice(ops)
+        
+        # Determine scenario
+        dice = random.random()
+        
+        # 1. THE NESTED BOSS: Multiple colons needed
+        if dice < 0.35:
+            fixed = f"if {v1} {op1} {val1}: if {v2} != {val2}: print({v3})"
+            buggy = f"if {v1} {op1} {val1} if {v2} != {val2} print({v3})"
+            # Occasionally add a spelling typo to the nested bug
+            if random.random() < 0.5: buggy = buggy.replace("print", "pritn")
 
-        for i in range(num_entries):
-            # Fill out a template
-            fixed_template, bugs = random.choice(templates)
-            v, v2, v3 = random.sample(variables, 3)
-            val, val2, val3 = random.randint(0, 10), random.randint(11, 20), random.randint(21, 30)
-            m = random.choice(messages)
-            fn = random.choice(functions)
-            a = random.choice(['', 'x', 'a, b'])
+        # 2. THE INLINE ACTION: Colon in the middle of text
+        elif dice < 0.65:
+            fixed = f"while {v1} < {val1}: {v1} += 1; {v2} = {v1}"
+            buggy = f"while {v1} < {val1} {v1} += 1 {v2} = {v1}"
 
-            fixed = fixed_template.format(var=v, var2=v2, var3=v3, val=val, val2=val2, val3=val3, msg=m, i=v, func=fn, arg=a)
-            
-            # Decision: Create a bug or keep it as identity mapping?
-            if random.random() < identity_ratio:
-                buggy = fixed # Identity: No change needed
-            else:
-                buggy_pattern = random.choice(bugs)
-                buggy = buggy_pattern.format(var=v, var2=v2, var3=v3, val=val, val2=val2, val3=val3, msg=m, i=v, func=fn, arg=a)
+        # 3. SPACING & SPELLING CRASH:
+        elif dice < 0.85:
+            # Randomly picks a keyword to break
+            keywords = [("for", "fpr"), ("print", "peint"), ("while", "whil"), ("if", "iff")]
+            k_fix, k_bug = random.choice(keywords)
+            fixed = f"{k_fix} {v1} in range({val1}): print({v1})"
+            buggy = f"{k_bug} {v1} in range({val1}) print({v1})"
 
-            writer.writerow({'buggy_code': buggy, 'fixed_code': fixed})
+        # 4. IDENTITY MAPPING: 15% Clean Code
+        else:
+            fixed = f"if {v1} == {val1}: {v2} = {v3}"
+            buggy = fixed
 
-    print(f"Successfully generated {num_entries} rows (approx {int(num_entries*identity_ratio)} are identity mappings).")
+        # Final pass: random character noise to 10% of buggy strings
+        if random.random() < 0.1 and buggy != fixed:
+            buggy = add_noise(buggy)
 
-if __name__ == "__main__":
-    generate_dataset(10000)
+        dataset.append({"buggy_code": buggy, "fixed_code": fixed})
+
+    return pd.DataFrame(dataset)
+
+# Generate and Save
+df = generate_pro_dataset(60000) # Aiming high for 3 layers!
+df.to_csv("advanced_python_data.csv", index=False)
+print(f"Generated {len(df)} samples of deep structural code.")
